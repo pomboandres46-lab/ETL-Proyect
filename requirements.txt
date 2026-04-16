@@ -1,0 +1,4 @@
+apache-airflow==2.11.2
+great_expectations==0.18.19
+pandas
+sqlite3
