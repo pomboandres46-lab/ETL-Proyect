@@ -1,15 +1,25 @@
-import yfinance as yf
-import os
+from Utils.Request import Leer_json, Yahoo, Finhub
+import pandas as pd
 
-symbol = "EURUSD=X"
-period = "2d"
-interval = "1m"
-data = yf.download(symbol, period=period, interval=interval)
 
-print(data)
 
-# Crear las carpetas si no existen
-os.makedirs('data/yahoo', exist_ok=True)
 
-# Guardar el archivo en formato CSV
-data.to_csv('data/yahoo.csv')
+opcion= input("Inicializar? \n 1 = Si \n 0 = No\n:")
+
+if opcion   == 0:
+    exit
+else:
+    symbol = input(f"Escoge una divisa:\n{pd.DataFrame(Leer_json()).head()}\n: ")
+    symbol=Leer_json()[int(symbol)]
+
+    #Inciando Tareas 
+
+    #Extraccion
+
+    #Yahoo
+    print("Inciacizando Yahoo...")
+    Yahoo(symbol, '2d', '1m')
+    
+    #Finhub
+    print("Inciacizando Finhub...")
+    Finhub(symbol)
