@@ -17,6 +17,8 @@ def Guarda(Fuente, data):
     if Fuente == "Yahoo":
 
         try:
+            if not os.path.exists(CSV_FILE_YAHOO):
+                os.makedirs(CSV_FILE_YAHOO)
             
             df_new = pd.DataFrame(data)
             print("Ejecutando Guardado yahoo...")
@@ -32,6 +34,8 @@ def Guarda(Fuente, data):
 
     elif Fuente == "Finhub":
         try:
+            if not os.path.exists(CSV_FILE_FINHUB):
+                os.makedirs(CSV_FILE_FINHUB)
             df_new = pd.DataFrame(data['data'])
 
             # Guardado en modo Append
@@ -45,6 +49,8 @@ def Guarda(Fuente, data):
 
     elif Fuente == "Alpha":
         try:
+            if not os.path.exists(CSV_FILE_ALPHA):
+                os.makedirs(CSV_FILE_ALPHA)
             info = data['Realtime Currency Exchange Rate']
             data_new = pd.DataFrame(info)
 
