@@ -74,24 +74,42 @@ def transformacion_yahoo():
     if os.path.exists(f"{Temp_path}/yahoo.csv"):
         try:
             data = pd.read_csv(f"{Temp_path}/yahoo.csv")
-            data = pd.DataFrame(data)
-            # Formateamos columnas
-            data.columns = [f"{col[0]}_{col[1]}" for col in data.columns]
-            symbol = data.columns[0].split("_")[1]
+            
+            # Buscar el simbolo si está en el nombre de las columnas (ej: Close_EURUSD=X)
+            symbol = None
+            for col in data.columns:
+                if "Close_" in col:
+                    symbol = col.split("Close_")[1]
+                    break
+                    
+            if symbol:
+                data = data.rename(columns={
+                    f'Close_{symbol}': 'close',
+                    f'Open_{symbol}': 'open',
+                    f'High_{symbol}': 'high',
+                    f'Low_{symbol}': 'low',
+                    f'Volume_{symbol}': 'volume'
+                })
+            else:
+                # Si las columnas ya vienen simples y no multi-index
+                symbol = "Unknown"
+                data.columns = [str(c).lower() for c in data.columns]
+            
+            # Renombrar columna de fecha generada por el reset_index
+            data = data.rename(columns={'Datetime': 'timestamp', 'Date': 'timestamp', 'datetime': 'timestamp', 'date': 'timestamp'})
+            
+            # Respaldo en caso de que sean datos antiguos mal guardados sin la fecha
+            if 'timestamp' not in data.columns:
+                data = data.reset_index().rename(columns={'index':'timestamp'})
+            
+            # Rellenamos symbol si no lo tenemos en column headers
+            if 'symbol' not in data.columns:
+                data['symbol'] = symbol
 
-            data = data.rename(columns={
-            f'Close_{symbol}': 'close',
-            f'Open_{symbol}': 'open',
-            f'High_{symbol}': 'high',
-            f'Low_{symbol}': 'low',
-            f'Volume_{symbol}': 'volume'
-            })
-
-            data = data.reset_index().rename(columns={'index':'timestamp', 'Datetime':'timestamp', 'Date':'timestamp'})
-            data['symbol'] = symbol
-            data['timestamp'] = pd.to_datetime(data['timestamp'], utc=True)    
+            data['timestamp'] = pd.to_datetime(data['timestamp'], utc=True, errors='coerce')    
             data["timestamp"] = data["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
+            # Seleccionamos las requeridas
             data = data[['timestamp','symbol','open','high','low','close']]
 
             data.to_csv(f"{Temp_path}/yahoo_transformado.csv", index=False)
