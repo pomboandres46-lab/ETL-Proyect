@@ -9,7 +9,7 @@ import os
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE RUTAS (Basado en Codespaces)
 # ---------------------------------------------------------
-# Usamos la variable de entorno de Airflow, o el directorio por defecto del contenedor
+# Usamos la variable de entorno de Airflow, o el directorio por defecto del contenedo
 
 BASE_PATH = os.environ.get('AIRFLOW_HOME', '/opt/airflow')
 yahoo_data = f"{BASE_PATH}/data/yahoo.csv"
@@ -26,10 +26,12 @@ default_args = {
      }
 
 # ---------------------------------------------------------
-# Declaramos la funcion de extraccion
+# Declaramos las funciones de extraccion
 # ---------------------------------------------------------
 
-def extraccion():   
+def extraccion_yahoo():
+    if not os.path.exists(Temp_path):
+        os.makedirs(Temp_path)    
 # Iniciamos extrayendo los datos por lotes, los cuales serán nuestra base o perfil de datos
     print(f" Extrayendo datos...")
     if not os.path.exists(yahoo_data):
@@ -40,6 +42,8 @@ def extraccion():
         print(f" Datos extraidos correctamente")
     except Exception as e:
         print(f" Error al extraer los datos: {e}")
+
+def extraccion_finhub():
 # Ahora extraemos los datos de finhub
     try:
         if not os.path.exists(finhub_data):
@@ -49,6 +53,8 @@ def extraccion():
         print(f" Datos extraidos correctamente")
     except Exception as e:
         print(f" Error al extraer los datos: {e}")
+
+def extraccion_alpha():
 # Ahora extraemos los datos de alpha
     try:
         if not os.path.exists(alpha_data):
@@ -60,10 +66,10 @@ def extraccion():
         print(f" Error al extraer los datos: {e}")
 
 # ---------------------------------------------------------
-# Declaramos la funcion de transformacion
+# Declaramos las funciones de transformacion
 # ---------------------------------------------------------
 
-def transformacion():
+def transformacion_yahoo():
     print(f" Transformando datos de yahoo...")
     if os.path.exists(f"{Temp_path}/yahoo.csv"):
         try:
@@ -94,6 +100,7 @@ def transformacion():
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
 
+def transformacion_finhub():
     if os.path.exists(f"{Temp_path}/finhub.csv"):
         print(f" Transformando datos de finhub...")
         try:
@@ -117,7 +124,7 @@ def transformacion():
 
             data.to_csv(f"{Temp_path}/finhub_transformado.csv", index=False)
             os.remove(f"{Temp_path}/finhub.csv")
-            print(f" Datos transformados correctamente")
+            print(f" Datos transformados correctamente{data}")
 
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
@@ -134,15 +141,26 @@ with DAG(
     ) as dag:     
 
         #Tarea de extraccion
-        extraccion_task = PythonOperator(
-            task_id='extraccion',
-            python_callable=extraccion,
+        extraccion_task_yahoo = PythonOperator(
+            task_id='extraccion_yahoo',
+            python_callable=extraccion_yahoo,
         )
 
-        transformacion_task = PythonOperator(
-            task_id='transformacion',
-            python_callable=transformacion,
+        extraccion_task_finhub = PythonOperator(
+            task_id='extraccion_finhub',
+            python_callable=extraccion_finhub,
         )
 
-extraccion_task >> transformacion_task
+        transformacion_task_yahoo = PythonOperator(
+            task_id='transformacion_yahoo',
+            python_callable=transformacion_yahoo,
+        )
+
+        transformacion_task_finhub = PythonOperator(
+            task_id='transformacion_finhub',
+            python_callable=transformacion_finhub,
+        )
+
+extraccion_task_yahoo >> transformacion_task_yahoo
+extraccion_task_finhub >> transformacion_task_finhub
         
