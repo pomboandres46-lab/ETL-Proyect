@@ -11,14 +11,14 @@ import os
 def Guarda(Fuente, data):
     FOLDER_PATH = os.environ.get('AIRFLOW_HOME', '/opt/airflow')
     CSV_FILE_YAHOO = f"{FOLDER_PATH}/data/yahoo.csv"
-    CSV_FILE_FINHUB = f"{FOLDER_PATH}/data/stream.csv"
-    CSV_FILE_ALPHA = f"{FOLDER_PATH}/data/stream.csv"
+    CSV_FILE_FINHUB = f"{FOLDER_PATH}/data/finhub.csv"
+    CSV_FILE_ALPHA = f"{FOLDER_PATH}/data/alpha.csv"
 
     if Fuente == "Yahoo":
 
         try:
-            if not os.path.exists(CSV_FILE_YAHOO):
-                os.makedirs(CSV_FILE_YAHOO)
+            if not os.path.exists(os.path.dirname(CSV_FILE_YAHOO)):
+                os.makedirs(os.path.dirname(CSV_FILE_YAHOO))
             
             df_new = pd.DataFrame(data)
             print("Ejecutando Guardado yahoo...")
@@ -34,8 +34,8 @@ def Guarda(Fuente, data):
 
     elif Fuente == "Finhub":
         try:
-            if not os.path.exists(CSV_FILE_FINHUB):
-                os.makedirs(CSV_FILE_FINHUB)
+            if not os.path.exists(os.path.dirname(CSV_FILE_FINHUB)):
+                os.makedirs(os.path.dirname(CSV_FILE_FINHUB))
             df_new = pd.DataFrame(data['data'])
 
             # Guardado en modo Append
@@ -49,8 +49,8 @@ def Guarda(Fuente, data):
 
     elif Fuente == "Alpha":
         try:
-            if not os.path.exists(CSV_FILE_ALPHA):
-                os.makedirs(CSV_FILE_ALPHA)
+            if not os.path.exists(os.path.dirname(CSV_FILE_ALPHA)):
+                os.makedirs(os.path.dirname(CSV_FILE_ALPHA))
             info = data['Realtime Currency Exchange Rate']
             data_new = pd.DataFrame(info)
 
