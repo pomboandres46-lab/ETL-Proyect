@@ -5,6 +5,21 @@
 
 ---
 
+# Ejecucion del proyecto
+Abra el main en codespaces, espera hasta que se carguen todos los recursos... automaticamente el contenedor realizará la instalacion de los requerimientos, e inicializacion del entorno Airflow con credenciales admin por defecto. Una vez cargado todo, dirijase a la terminal y ejecute el siguiente comando:
+
+```bash
+python -m airflow standalone
+```
+Una ves inicializado el UI de Airflow, dirijase a la pestaña puertos dentro de la misma terminal y de click derecho sobre el puerto 8080 o UI Airflow y modifique la visibilidad del puerto a public, de esta manera podrá acceder al UI de Airflow desde el logo del mundo que muestra el puerto.
+
+Una ves dentro de Airflow, dirijase a la pestaña DAGs y busque el DAG llamado `ETL_Delivery2`, deberia poder observarse las tareas reconocidas en el DAG. Antes de inicial el DAG lo primordial es inicializar la data por lotes y streaming, para ello dirijase a la pestaña terminal y ejecute el siguiente comando:
+
+```bash
+python preparar.py
+```
+ingrese por consola la opcion 1 para inicializar seguido de la divisa a conultar. Una ves finalizado el proceso, dirijase a la pestaña DAGs y active el DAG `ETL_Delivery2` desde el interruptor izquierdo.
+
 ## Descripción General
 Este proyecto implementa una canalización completa de **ETL (Extracción, Transformación, Carga/Unificación)** construida bajo el motor de Airflow. Se encarga de conectarse recurrentemente a 3 diferentes proveedores de APIs financieras, recolectar lotes de datos, transformarlos a una estructura temporal idéntica, pasarlos por un estricto validador de Calidad de Datos (Data Quality) con **Great Expectations**, y finalmente consolidar en una base local todos aquellos lotes que cumplan la normativa.
 
@@ -15,7 +30,7 @@ El DAG central se llama `ETL_Delivery2` (localizado en `dags/ETL.py`) y se ejecu
 Tres tareas paralelas (`extraccion_task_yahoo`, `extraccion_task_finhub`, y `extraccion_task_alpha`) ejecutan consultas a sus respectivas APIs usando llamadas a la web (HTTP Requests) o simulacros de recarga. Empaquetan el valor extraído en caché temporal.
 * Yahoo Finance: Requiere conexión de historial.
 * Finnhub: Optimizado para WebSockets (extrae valores cortos como `p`, `v`, `t`).
-* Alpha Vantage: Extracción JSON (Rate Limit free-tier = max 25/día).
+* Alpha Vantage: Extracción JSON (Plan gratuito = max 25/día).
 
 ### 2. Transformación
 Las tareas leen los CSV residuales de la fase extractiva usando métodos vectorizados de `Pandas`:
