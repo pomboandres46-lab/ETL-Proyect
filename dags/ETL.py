@@ -76,12 +76,18 @@ def Alpha():
 def extraccion_alpha():
 # Ahora extraemos los datos de alpha local usando la función definida
     try:
+        if os.path.exists(f"{Temp_path}/alpha.csv"):
+            os.remove(f"{Temp_path}/alpha.csv")
         data_alpha = Alpha()
+        if not isinstance(data_alpha, dict):
+            raise ValueError(f"Respuesta inválida de Alpha: {data_alpha}")
         data_alpha = pd.DataFrame([data_alpha])
         data_alpha.to_csv(f"{Temp_path}/alpha.csv", index=False)
         print(f" Datos extraidos correctamente")
         return 'transformacion_alpha'
     except Exception as e:
+        if os.path.exists(f"{Temp_path}/alpha.csv"):
+            os.remove(f"{Temp_path}/alpha.csv")
         print(f" Error al extraer los datos: {e}")
         return False
 
@@ -135,7 +141,7 @@ def transformacion_yahoo():
             data.to_csv(f"{Temp_path}/yahoo_transformado.csv", index=False)
             os.remove(f"{Temp_path}/yahoo.csv")
             print(f" Datos transformados correctamente")
-            return True
+            return f"{Temp_path}/yahoo_transformado.csv"
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
             return False
@@ -186,7 +192,7 @@ def transformacion_finhub():
             data.to_csv(f"{Temp_path}/finhub_transformado.csv", index=False)
             os.remove(f"{Temp_path}/finhub.csv")
             print(f" Datos transformados correctamente{data}")
-            return True
+            return f"{Temp_path}/finhub_transformado.csv"
 
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
@@ -197,19 +203,134 @@ def transformacion_alpha():
         print(f" Transformando datos de alpha...")
         try:
             data = pd.read_csv(f"{Temp_path}/alpha.csv")
-            data = pd.DataFrame([{
-                "symbol": f"{data['1. From_Currency Code']}/{data['3. To_Currency Code']}",
-                "price": float(data["5. Exchange Rate"]),
-                "timestamp": pd.to_datetime(data["6. Last Refreshed"])
-            }])
-            data = data[['timestamp','symbol','price']]
+            
+            expected_cols = [
+                '1. From_Currency Code',
+                '3. To_Currency Code',
+                '5. Exchange Rate',
+                '6. Last Refreshed'
+            ]
+            missing_cols = [c for c in expected_cols if c not in data.columns]
+            if missing_cols:
+                raise ValueError(f"Faltan columnas en alpha.csv: {missing_cols}. Columnas disponibles: {data.columns.tolist()}")
+
+            # Formatear columnas usando operaciones de Pandas (vectorizado)
+            symbol_col = data['1. From_Currency Code'].astype(str) + "/" + data['3. To_Currency Code'].astype(str)
+            price_col = data["5. Exchange Rate"].astype(float)
+            
+            # Dar mismo formato para la fecha que Yahoo y Finhub
+            timestamp_col = pd.to_datetime(data["6. Last Refreshed"], utc=True, errors='coerce')
+            timestamp_col = timestamp_col.dt.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Crear el dataframe final 
+            df_transformado = pd.DataFrame({
+                "timestamp": timestamp_col,
+                "symbol": symbol_col,
+                "price": price_col
+            })
+
+            data = df_transformado[['timestamp','symbol','price']]
             data.to_csv(f"{Temp_path}/alpha_transformado.csv", index=False)
             os.remove(f"{Temp_path}/alpha.csv")
-            print(f" Datos transformados correctamente{data}")
-            return True
+            print(f" Datos transformados correctamente\n{data}")
+            return f"{Temp_path}/alpha_transformado.csv"
         except Exception as e:
+            if os.path.exists(f"{Temp_path}/alpha.csv"):
+                os.remove(f"{Temp_path}/alpha.csv")
             print(f" Error al transformar los datos: {e}")
             return False
+    print(f" No existe alpha.csv o no se extrajo correctamente")
+    return False
+
+def Validar_gx(**kwargs):
+    import great_expectations as gx
+    
+    # XCom Pull dinámico
+    ti = kwargs['ti']
+    target_task_id = kwargs.get('target_task_id')
+    ruta_csv = ti.xcom_pull(task_ids=target_task_id)
+
+    try:
+        if not ruta_csv or not os.path.exists(ruta_csv):
+            print(f" No se pudo leer {ruta_csv} generada por {target_task_id}.")
+            return 'cuarentena'
+            
+        print(f" Iniciando validación con Great Expectations para: {ruta_csv}")
+        
+        # Leer a dataset pandas y envolver en dataset de GX
+        df = pd.read_csv(ruta_csv)
+        gx_df = gx.from_pandas(df)
+        
+        # 1. Ejecutar grupo de expectativas básicas
+        
+        # Comprobar obligatorias 
+        gx_df.expect_column_values_to_not_be_null('symbol')
+        gx_df.expect_column_values_to_not_be_null('timestamp')
+        gx_df.expect_column_values_to_not_be_null('close')
+        gx_df.expect_column_values_to_not_be_null('open')
+        gx_df.expect_column_values_to_not_be_null('high')
+        gx_df.expect_column_values_to_not_be_null('low')
+
+        # Comprobar QUE NO HAYA VALORES NEGATIVOS EN LOS PRECIOS
+        gx_df.expect_column_values_to_be_between('close', min_value=0, strict_min=True)
+        gx_df.expect_column_values_to_be_between('open', min_value=0, strict_min=True)
+
+        # Comrpobar que no haya duplicados en timestamp
+        gx_df.expect_column_values_to_be_unique('timestamp')
+
+        # 2. Ejecutar validación
+        results = gx_df.validate()
+        
+        # 3. Evaluar e Informar resultados
+        if results["success"]:
+            print(f" Validacion Exitosa para {ruta_csv}")
+            return 'Merge'
+        else:
+            print(f" Fallaron las validaciones de negocio en {ruta_csv}")
+            return 'Cuarentena'
+
+    except Exception as e:
+        print(f" Error al validar los datos en {ruta_csv}: {e}")
+        return 'cuarentena'
+
+def verificar_db():
+    try:
+        import sqlite3
+        if sqlite3.connect("db.db"):
+            return 'Merge'
+        else:
+            return 'crear_db'
+       
+    except Exception as e:
+        print(f" Error al verificar la base de datos: {e}")
+        return False
+    
+def crear_db():
+    try:
+        import sqlite3
+        conn = sqlite3.connect("db.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS DATOS (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                symbol TEXT,
+                open REAL,
+                high REAL,
+                low REAL,
+                close REAL
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("Base de datos creada correctamente")
+        return 'Merge'
+    except Exception as e:
+        print(f" Error al crear la base de datos: {e}")
+        return False
+
+def Merge():
+    return 'cargar_db'
 
 
 with DAG(
@@ -253,10 +374,61 @@ with DAG(
             python_callable=transformacion_alpha,
         )
 
-extraccion_task_yahoo >> transformacion_task_yahoo
-extraccion_task_finhub >> transformacion_task_finhub
-extraccion_task_alpha >> transformacion_task_alpha
+        validar_task_yahoo = BranchPythonOperator(
+            task_id='validar_yahoo',
+            python_callable=Validar_gx,
+            op_kwargs={'target_task_id': 'transformacion_yahoo'},
+        )
 
+        validar_task_finhub = BranchPythonOperator(
+            task_id='validar_finhub',
+            python_callable=Validar_gx,
+            op_kwargs={'target_task_id': 'transformacion_finhub'},
+        )
 
+        validar_task_alpha = BranchPythonOperator(
+            task_id='validar_alpha',
+            python_callable=Validar_gx,
+            op_kwargs={'target_task_id': 'transformacion_alpha'},
+        )
 
         
+
+        mover_cuarentena = BashOperator(
+            task_id='cuarentena',
+            bash_command='echo "[ ❌ ] Moviendo lote a zona de cuarentena..."',
+        )
+
+        verificar_db_task = BranchPythonOperator(
+            task_id='verificar_db',
+            python_callable=verificar_db,
+        )
+        crear_db_task = PythonOperator(
+            task_id='crear_db',
+            python_callable=crear_db,
+        )
+        
+        Merge_task = BashOperator(
+            task_id='Merge',
+            bash_command='echo "[ ✅ ] merge con base de datos"',
+        )
+        validar_merge = BranchPythonOperator(
+            task_id='validar_merge',
+            python_callable=Validar_gx,
+            op_kwargs={'target_task_id': 'Merge'},
+        )
+
+        cargar_db_task = BashOperator(
+            task_id='cargar_db',
+            bash_command='echo "[ 🚀 ] Cargando datos a la base de datos..."',
+        )
+
+verificar_db_task >> [crear_db_task, Merge_task]
+
+extraccion_task_yahoo >> transformacion_task_yahoo >> validar_task_yahoo >> [Merge_task, mover_cuarentena]
+extraccion_task_finhub >> transformacion_task_finhub >> validar_task_finhub >> [Merge_task, mover_cuarentena]
+extraccion_task_alpha >> transformacion_task_alpha >> validar_task_alpha >> [Merge_task, mover_cuarentena]
+
+Merge_task >> validar_merge >> [cargar_db_task, mover_cuarentena]
+
+
