@@ -2,6 +2,7 @@ import websocket
 import json
 import Save
 import yfinance as yf
+import requests
 
 
 
@@ -16,6 +17,13 @@ def Yahoo(symbol, period, interval):
     print(f" Datos recibidos: symbol: {symbol}, period: {period}, interval: {interval}")
     data = yf.download(symbol, period=period, interval=interval)
     Save.Guarda("Yahoo", data)
+
+def Alpha():
+    API_KEY = "3E1NL1R2CK7L2AIW"
+    url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey={API_KEY}"
+    data = requests.get(url).json()
+    data = data['Realtime Currency Exchange Rate']
+    return data
 
 
 def Finhub(simbol):

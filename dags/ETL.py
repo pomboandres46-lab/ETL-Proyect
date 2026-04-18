@@ -14,8 +14,8 @@ import os
 BASE_PATH = os.environ.get('AIRFLOW_HOME', '/opt/airflow')
 yahoo_data = f"{BASE_PATH}/data/yahoo.csv"
 finhub_data = f"{BASE_PATH}/data/finhub.csv"
-alpha_data = f"{BASE_PATH}/data/alpha.csv"
 Temp_path = f"{BASE_PATH}/data/temp"
+
 
 #1. Definir argumentos por defecto
 default_args = {
@@ -36,12 +36,13 @@ def extraccion_yahoo():
     print(f" Extrayendo datos...")
     if not os.path.exists(yahoo_data):
         print("No se encontro el archivo yahoo.csv")  
-    try:
-        data_yahoo = pd.read_csv(yahoo_data)
-        data_yahoo.to_csv(f"{Temp_path}/yahoo.csv", index=False)
-        print(f" Datos extraidos correctamente")
-    except Exception as e:
-        print(f" Error al extraer los datos: {e}")
+    else:
+        try:
+            data_yahoo = pd.read_csv(yahoo_data)
+            data_yahoo.to_csv(f"{Temp_path}/yahoo.csv", index=False)
+            print(f" Datos extraidos correctamente")
+        except Exception as e:
+            print(f" Error al extraer los datos: {e}")
 
 def extraccion_finhub():
 # Ahora extraemos los datos de finhub
@@ -57,9 +58,8 @@ def extraccion_finhub():
 def extraccion_alpha():
 # Ahora extraemos los datos de alpha
     try:
-        if not os.path.exists(alpha_data):
-            raise FileNotFoundError("No se encontro el archivo alpha.csv")
-        data_alpha = pd.read_csv(alpha_data)
+        import Utils.Request
+        data_alpha = Utils.Request.Alpha()
         data_alpha.to_csv(f"{Temp_path}/alpha.csv", index=False)
         print(f" Datos extraidos correctamente")
     except Exception as e:
@@ -168,12 +168,29 @@ def transformacion_finhub():
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
 
+def transformacion_alpha():
+    if os.path.exists(f"{Temp_path}/alpha.csv"):
+        print(f" Transformando datos de alpha...")
+        try:
+            data = pd.read_csv(f"{Temp_path}/alpha.csv")
+            data = pd.DataFrame([{
+                "symbol": f"{data['1. From_Currency Code']}/{data['3. To_Currency Code']}",
+                "price": float(data["5. Exchange Rate"]),
+                "timestamp": pd.to_datetime(data["6. Last Refreshed"])
+            }])
+            data = data[['timestamp','symbol','price']]
+            data.to_csv(f"{Temp_path}/alpha_transformado.csv", index=False)
+            os.remove(f"{Temp_path}/alpha.csv")
+            print(f" Datos transformados correctamente{data}")
+        except Exception as e:
+            print(f" Error al transformar los datos: {e}")
+
 
 with DAG(
     'ETL_Delivery2',
     default_args=default_args,
     description='ETL_Delivery2',
-    schedule_interval=None, # Changed schedule_interval for easier testing
+    schedule_interval='2m', # Changed schedule_interval for easier testing
     start_date=datetime(2026, 4, 16),
     catchup=False,
     tags=['Delivery2'],
