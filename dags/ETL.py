@@ -5,6 +5,7 @@ from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.empty import EmptyOperator
 import pandas as pd
 import os
+import requests
 
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE RUTAS (Basado en Codespaces)
@@ -35,37 +36,55 @@ def extraccion_yahoo():
 # Iniciamos extrayendo los datos por lotes, los cuales serán nuestra base o perfil de datos
     print(f" Extrayendo datos...")
     if not os.path.exists(yahoo_data):
-        print("No se encontro el archivo yahoo.csv")  
+        print("No se encontro el archivo yahoo.csv") 
+        return False 
     else:
         try:
             data_yahoo = pd.read_csv(yahoo_data)
             data_yahoo.to_csv(f"{Temp_path}/yahoo.csv", index=False)
             print(f" Datos extraidos correctamente")
+            return 'transformacion_yahoo'
         except Exception as e:
             print(f" Error al extraer los datos: {e}")
+            return False
 
 def extraccion_finhub():
 # Ahora extraemos los datos de finhub
     try:
         if not os.path.exists(finhub_data):
             raise FileNotFoundError("No se encontro el archivo finhub.csv")
+            return False
         data_finhub = pd.read_csv(finhub_data)
         data_finhub.to_csv(f"{Temp_path}/finhub.csv", index=False)
         print(f" Datos extraidos correctamente")
+        return 'transformacion_finhub'
     except Exception as e:
         print(f" Error al extraer los datos: {e}")
+        return False
+
+def Alpha():
+    API_KEY = "3E1NL1R2CK7L2AIW"
+    url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey={API_KEY}"
+    data = requests.get(url).json()
+    
+    # Manejo del Rate Limit o Error de API
+    if 'Realtime Currency Exchange Rate' not in data:
+        raise ValueError(f"Respuesta inesperada de AlphaVantage (¿Límite de API alcanzado?): {data}")
+        
+    return data['Realtime Currency Exchange Rate']
 
 def extraccion_alpha():
-# Ahora extraemos los datos de alpha
+# Ahora extraemos los datos de alpha local usando la función definida
     try:
-        import Utils.Request
-        data_alpha = Utils.Request.Alpha()
+        data_alpha = Alpha()
         data_alpha = pd.DataFrame([data_alpha])
         data_alpha.to_csv(f"{Temp_path}/alpha.csv", index=False)
         print(f" Datos extraidos correctamente")
+        return 'transformacion_alpha'
     except Exception as e:
         print(f" Error al extraer los datos: {e}")
-extraccion_alpha()
+        return False
+
 # ---------------------------------------------------------
 # Declaramos las funciones de transformacion
 # ---------------------------------------------------------
@@ -116,8 +135,10 @@ def transformacion_yahoo():
             data.to_csv(f"{Temp_path}/yahoo_transformado.csv", index=False)
             os.remove(f"{Temp_path}/yahoo.csv")
             print(f" Datos transformados correctamente")
+            return True
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
+            return False
 
 def transformacion_finhub():
     if os.path.exists(f"{Temp_path}/finhub.csv"):
@@ -165,9 +186,11 @@ def transformacion_finhub():
             data.to_csv(f"{Temp_path}/finhub_transformado.csv", index=False)
             os.remove(f"{Temp_path}/finhub.csv")
             print(f" Datos transformados correctamente{data}")
+            return True
 
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
+            return False
 
 def transformacion_alpha():
     if os.path.exists(f"{Temp_path}/alpha.csv"):
@@ -183,8 +206,10 @@ def transformacion_alpha():
             data.to_csv(f"{Temp_path}/alpha_transformado.csv", index=False)
             os.remove(f"{Temp_path}/alpha.csv")
             print(f" Datos transformados correctamente{data}")
+            return True
         except Exception as e:
             print(f" Error al transformar los datos: {e}")
+            return False
 
 
 with DAG(
