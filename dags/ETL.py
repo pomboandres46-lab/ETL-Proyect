@@ -191,7 +191,7 @@ with DAG(
     'ETL_Delivery2',
     default_args=default_args,
     description='ETL_Delivery2',
-    schedule_interval='2m', # Changed schedule_interval for easier testing
+    schedule_interval=timedelta(minutes=2), # Changed schedule_interval for easier testing
     start_date=datetime(2026, 4, 16),
     catchup=False,
     tags=['Delivery2'],
