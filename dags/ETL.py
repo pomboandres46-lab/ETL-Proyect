@@ -125,8 +125,27 @@ def transformacion_finhub():
             data = pd.read_csv(f"{Temp_path}/finhub.csv")
             data = pd.DataFrame(data)
             
-            data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)
+            # Finnhub devuelve los datos con llaves cortas: p (price), s (symbol), t (timestamp), v (volume)
+            # Renombramos a los esperados si vienen en ese formato
+            rename_map = {
+                "p": "price",
+                "s": "symbol",
+                "t": "timestamp",
+                "v": "volume"
+            }
+            # Solo renombramos si encontramos estas columnas, por si ya venían bien formateadas
+            data = data.rename(columns=lambda x: rename_map.get(x, x))
 
+            # Verificar si existe timestamp, si no abortar
+            if "timestamp" not in data.columns:
+                raise ValueError(f"Falta columna 'timestamp'. Columnas encontradas: {data.columns.tolist()}")
+
+            # Finnhub manda el timestamp en milisegundos (Unix timestamp)
+            if pd.api.types.is_numeric_dtype(data['timestamp']):
+                data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms', utc=True)
+            else:
+                data['timestamp'] = pd.to_datetime(data['timestamp'], utc=True, errors='coerce')
+                
             # Agrupar por minuto y calcular OHLC
             ohlc = (
                 data.groupby(["symbol", data["timestamp"].dt.floor("min")])["price"]
@@ -137,6 +156,8 @@ def transformacion_finhub():
             ohlc = ohlc.rename(columns={"timestamp": "minute"})
 
             ohlc["timestamp"] = ohlc["minute"]
+            # Convertimos la fecha al mismo formato que yahoo string
+            ohlc["timestamp"] = ohlc["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
             data = ohlc[["timestamp", "symbol", "open", "high", "low", "close"]]
 
