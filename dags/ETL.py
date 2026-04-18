@@ -60,11 +60,12 @@ def extraccion_alpha():
     try:
         import Utils.Request
         data_alpha = Utils.Request.Alpha()
+        data_alpha = pd.DataFrame([data_alpha])
         data_alpha.to_csv(f"{Temp_path}/alpha.csv", index=False)
         print(f" Datos extraidos correctamente")
     except Exception as e:
         print(f" Error al extraer los datos: {e}")
-
+extraccion_alpha()
 # ---------------------------------------------------------
 # Declaramos las funciones de transformacion
 # ---------------------------------------------------------
@@ -207,6 +208,12 @@ with DAG(
             python_callable=extraccion_finhub,
         )
 
+        extraccion_task_alpha = PythonOperator(
+            task_id='extraccion_alpha',
+            python_callable=extraccion_alpha,
+        )
+        #Tarea de transformacion
+        
         transformacion_task_yahoo = PythonOperator(
             task_id='transformacion_yahoo',
             python_callable=transformacion_yahoo,
@@ -216,7 +223,15 @@ with DAG(
             task_id='transformacion_finhub',
             python_callable=transformacion_finhub,
         )
+        transformacion_task_alpha = PythonOperator(
+            task_id='transformacion_alpha',
+            python_callable=transformacion_alpha,
+        )
 
 extraccion_task_yahoo >> transformacion_task_yahoo
 extraccion_task_finhub >> transformacion_task_finhub
+extraccion_task_alpha >> transformacion_task_alpha
+
+
+
         
